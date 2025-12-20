@@ -1,722 +1,305 @@
-# NewsHub - Enterprise-Grade News Aggregation Platform
+# NewsHub - Full-Stack News Aggregator
 
-> **A production-ready news aggregation platform showcasing advanced software architecture, scalability, and clean code principles.**
+A news aggregation platform built for innoscripta's take-home challenge. This project pulls articles from NewsAPI.org, The Guardian, and The New York Times, storing them locally for fast filtering and personalized feeds.
 
-NewsHub is a comprehensive full-stack application that fetches articles from multiple trusted news sources via APIs and provides personalized news feeds. Built with enterprise-level architecture patterns and best practices, this project demonstrates professional software engineering principles.
+**Stack:** Laravel 11 + Next.js 15 (TypeScript) + Docker
 
-## 🏗️ Architecture Highlights
+## What I Built
 
-### Clean Architecture & Design Patterns
+I went beyond the basic requirements because I wanted to demonstrate how I'd approach a real production system. Instead of just making the features work, I focused on building something maintainable and extensible.
 
-This project implements industry-standard architectural patterns for maintainability, scalability, and testability:
+### Core Features (As Required)
+- User authentication with Laravel Sanctum
+- Article search and filtering (keyword, date, source, category, author)
+- Personalized news feed based on user preferences
+- Mobile-responsive design with Tailwind
+- All data fetched via scheduled commands and stored locally
 
-#### **Repository Pattern**
-- **Data Access Layer**: All database operations are abstracted through repositories (`ArticleRepository`, `SourceRepository`, etc.)
-- **Separation of Concerns**: Business logic is completely decoupled from data access
-- **Testability**: Easy to mock repositories for unit testing
-- **Flexibility**: Database implementation can be changed without affecting business logic
+### What Makes This Implementation Different
 
-#### **Service Layer Pattern**
-- **NewsService**: Core orchestrator for news fetching using adapter pattern
-- **ArticleService**: Centralized business logic for article operations
-- **AuthService**: Handles authentication business logic (register, login, logout)
-- **Single Responsibility**: Each service has a focused, well-defined purpose
-- **Reusability**: Services can be used across controllers, commands, and jobs
-- **No Direct DB Access**: All services use repositories exclusively
+**1. Adapter Pattern for News Sources**
 
-#### **Profile-Based Configuration**
-- **Config-Driven Architecture**: API sources defined in `config/news_sources.php`
-- **Scalability**: Add new news sources without code changes, just configuration
-- **Field Mapping**: Dynamic transformation of different API responses to unified schema
-- **Rate Limit Management**: Built-in rate limiting per API profile
+Rather than hardcoding each API's logic, I built an adapter system. Each news source (NewsAPI, Guardian, NYT) has its own adapter class that handles the API-specific quirks:
 
 ```php
-// Adding a new source is as simple as running a command
-php artisan news:add-source bbc-news
-// Or via configuration
-'new_source' => [
-    'name' => 'New News API',
-    'base_url' => 'https://api.example.com/',
-    'api_key' => env('NEW_SOURCE_KEY'),
-    'field_mapping' => [/* mappings */],
+abstract class AbstractNewsAdapter {
+    abstract protected function extractArticles(array $data): array;
+    public function fetchArticles(array $params = []): ?array { }
+}
+```
+
+Why? Because news APIs are inconsistent. The Guardian returns `response.results`, NewsAPI returns `articles`, NYT has its own structure. The adapter pattern means adding a new source is just creating a new adapter class - no touching existing code.
+
+**2. Repository + Service Layer Architecture**
+
+I separated concerns into distinct layers:
+- **Controllers**: Handle HTTP, nothing else
+- **Form Requests**: All validation logic lives here
+- **Services**: Business logic and orchestration
+- **Repositories**: Database operations only
+- **Helpers**: Reusable utilities (transformers, category/author management)
+
+The strict rule I followed: Services never touch the database directly. All DB operations go through repositories. This made testing way easier and keeps the codebase flexible.
+
+**3. Configuration-Driven Design**
+
+All news sources are defined in `config/news_sources.php` with field mappings:
+
+```php
+'guardian' => [
+    'field_mapping' => [
+        'title' => 'webTitle',
+        'description' => 'fields.trailText',
+        'content' => 'fields.bodyText',
+        // ...
+    ]
 ]
 ```
 
-#### **Adapter Pattern for News Sources**
-- **Abstract Base Class**: `AbstractNewsAdapter` defines common interface
-- **Concrete Adapters**: Each news source has its own adapter (NewsApiAdapter, GuardianAdapter, NYTAdapter)
-- **Strategy Pattern**: Different extraction strategies for different API responses
-- **Easy Extension**: Add new sources by creating a new adapter class
-- **Single Responsibility**: Each adapter only handles its specific API structure
+This means I can add a new source without changing code - just add config. I even built a CLI command (`php artisan news:add-source`) that scaffolds everything automatically.
 
-```php
-// Each adapter implements source-specific logic
-class NewsApiAdapter extends AbstractNewsAdapter
-{
-    protected function extractArticles(array $data): array
-    {
-        return $data['articles'] ?? [];
-    }
-}
-```
+**4. React Query with Query Key Factories**
 
-#### **Helper Classes for Clean Code**
-- **ArticleTransformer**: Transforms API data to unified schema
-- **CategoryHelper**: Manages category operations (get or create)
-- **AuthorHelper**: Manages author operations (get or create)
-- **Separation of Concerns**: Helpers handle specific utility functions
-- **Reusable**: Used across services for consistent data operations
-
-#### **Form Request Validation**
-- **Centralized Validation**: All validation rules in dedicated Form Request classes
-- **Custom Error Messages**: User-friendly validation messages
-- **Auto-Validation**: Laravel automatically validates before controller execution
-- **Type Safety**: Validated data is type-safe and clean
-- **Request Classes**: LoginRequest, RegisterRequest, ArticleFilterRequest, SearchArticlesRequest, UpdatePreferenceRequest
-
-```php
-// Clean controller with automatic validation
-public function register(RegisterRequest $request)
-{
-    $result = $this->authService->register($request->validated());
-    return response()->json(['user' => new UserResource($result['user'])]);
-}
-```
-
-### Frontend Architecture Excellence
-
-#### **React Query with Query Key Factories**
-- **Centralized Data Fetching**: All API calls managed through custom hooks
-- **Query Key Factories**: Scalable cache management and invalidation strategy
-- **Optimistic Updates**: Instant UI feedback with server synchronization
-- **Automatic Cache Invalidation**: Related queries invalidated intelligently
+On the frontend, I used TanStack Query (React Query v5) with a query key factory pattern:
 
 ```typescript
-// Query Key Factories for scalable cache management
 export const articleKeys = {
   all: ['articles'] as const,
   lists: () => [...articleKeys.all, 'list'] as const,
   list: (page: number, filters?: ArticleFilters) =>
     [...articleKeys.lists(), { page, ...filters }] as const,
-  personalizedPages: () => [...articleKeys.all, 'personalized'] as const,
 };
 ```
 
-#### **Custom Hooks Pattern**
-- **Abstraction**: UI components never call APIs directly
-- **DRY Principle**: Reusable data fetching logic
-- **Type Safety**: Full TypeScript support with inferred types
-- **Consistency**: Uniform loading, error, and success states
+This gives me granular cache control. When a user updates their preferences, I can invalidate just the personalized feed queries without touching the main article list cache.
 
-### Code Quality & Principles
+## Technical Decisions & Trade-offs
 
-#### **SOLID Principles**
-- ✅ **Single Responsibility**: Each class/function has one clear purpose
-- ✅ **Open/Closed**: Extensible through configuration, closed for modification
-- ✅ **Liskov Substitution**: Interface-based design allows substitutability
-- ✅ **Interface Segregation**: Focused, minimal interfaces
-- ✅ **Dependency Inversion**: Depend on abstractions, not concretions
+**Why Laravel Sanctum over JWT?**
+Simpler to implement, built into Laravel, and perfect for SPA authentication. For this scale, it's the right choice.
 
-#### **Clean Code Practices**
-- **Meaningful Names**: Self-documenting code with descriptive variable/function names
-- **Small Functions**: Each function does one thing well
-- **DRY (Don't Repeat Yourself)**: Eliminated code duplication through abstraction
-- **KISS (Keep It Simple)**: Avoided over-engineering, focused on requirements
-- **Consistent Formatting**: Uniform code style across the project
+**Why Next.js App Router over Pages Router?**
+I wanted to use the latest patterns. App Router is more verbose but the server/client component split makes sense for this use case.
 
-#### **TypeScript Excellence**
-- **Strict Type Checking**: Full type safety across frontend
-- **Interface-Driven Design**: Clear contracts between components
-- **Type Inference**: Leveraging TypeScript's powerful inference
-- **Generics**: Reusable, type-safe components and utilities
+**Why store articles locally vs. fetching on-demand?**
+The requirements specified this, but it's also the right call. Free tier API limits are tight (NewsAPI gives 100 requests/day). By fetching hourly and storing locally, we can support unlimited users filtering without hitting rate limits.
 
-## 🚀 Scalability Features
+**Why TypeScript strict mode?**
+Catches bugs at compile time. The initial setup takes longer, but it pays off when refactoring.
 
-### Backend Scalability
+## Architecture Overview
 
-1. **Profile-Based API Integration**
-   - Add unlimited news sources via configuration
-   - No code changes required for new sources
-   - Dynamic field mapping for different API schemas
+```
+Backend Flow:
+Controller → Form Request → Service → Repository → Database
+                              ↓
+                        Helpers & Adapters
 
-2. **Database Optimization**
-   - Strategic indexes on `url`, `published_at`, `source_id`
-   - Eager loading to prevent N+1 queries
-   - Efficient pagination for large datasets
+News Fetching:
+NewsService → Adapter Factory → Specific Adapter → External API
+                                        ↓
+                              ArticleTransformer
+                                        ↓
+                              CategoryHelper/AuthorHelper
+                                        ↓
+                              ArticleRepository
+```
 
-3. **Command-Based Architecture**
-   - CLI commands for batch operations
-   - Scheduled tasks for automated news fetching
-   - Background job support ready
-
-4. **Caching Strategy**
-   - Laravel's cache system integrated
-   - API response caching to reduce external calls
-   - Rate limit compliance built-in
-
-### Frontend Scalability
-
-1. **React Query Cache Management**
-   - Query key factories for granular cache control
-   - Automatic background refetching
-   - Stale-while-revalidate pattern
-
-2. **Component Architecture**
-   - Atomic design principles
-   - Highly reusable components
-   - Lazy loading ready
-
-3. **Performance Optimization**
-   - Next.js App Router with RSC
-   - Standalone output for Docker
-   - Image optimization configured
-   - Client-side state minimized
-
-## ✨ Features
-
-### Core Functionality
-- **Multi-Source News Aggregation**: NewsAPI.org, The Guardian, The New York Times
-- **User Authentication**: Secure token-based auth with Laravel Sanctum
-- **Personalized Feed**: AI-powered recommendations based on user preferences
-- **Advanced Filtering**: Filter by source, category, author, date range
-- **Full-Text Search**: Search articles by keywords across all fields
-- **User Preferences**: Customize sources, categories, and authors
-- **Responsive Design**: Mobile-first approach with Tailwind CSS
-- **Real-Time Updates**: Automated hourly news fetching
-
-### Advanced Features
-- **Smart Field Mapping**: Automatic transformation of diverse API schemas
-- **Rate Limit Compliance**: Built-in tracking to stay within API limits
-- **Database Seeders**: Pre-configured seeders for sources and categories for instant setup
-- **Error Handling**: Comprehensive error handling and user feedback
-- **Loading States**: Skeleton loaders for better UX
-- **Empty States**: Helpful messages when no data available
-- **Pagination**: Efficient pagination for large result sets
-
-## 🛠️ Tech Stack
-
-### Backend (Laravel)
-- **Framework**: Laravel 11 with modern PHP 8.2
-- **Database**: MySQL 8.0 with optimized indexing
-- **Authentication**: Laravel Sanctum (token-based)
-- **Architecture**: Repository Pattern + Service Layer
-- **API Integration**: Multi-source with unified interface
-- **Task Scheduling**: Laravel Scheduler for automation
-
-### Frontend (Next.js + TypeScript)
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript (strict mode)
-- **State Management**: TanStack Query (React Query v5)
-- **Styling**: Tailwind CSS with responsive utilities
-- **HTTP Client**: Axios with interceptors
-- **Patterns**: Custom Hooks, Query Key Factories, Context API
-
-### DevOps & Infrastructure
-- **Containerization**: Docker with multi-stage builds
-- **Orchestration**: Docker Compose
-- **Web Server**: Nginx (optimized configuration)
-- **Process Management**: Supervisor
-- **Environment Management**: Environment-based configuration
-
-## 📊 Project Structure
+## Project Structure
 
 ```
 news/
-├── news-backend/                  # Laravel Backend
+├── news-backend/
 │   ├── app/
-│   │   ├── Console/Commands/      # CLI Commands
-│   │   │   ├── FetchNewsCommand.php        # Fetch articles from APIs
-│   │   │   └── AddNewsSourceCommand.php    # Add new news source (automated)
-│   │   ├── Helpers/               # Helper Classes
-│   │   │   ├── ArticleTransformer.php      # Transform API data
-│   │   │   ├── CategoryHelper.php          # Category operations
-│   │   │   └── AuthorHelper.php            # Author operations
+│   │   ├── Console/Commands/          # CLI commands
+│   │   │   ├── FetchNewsCommand.php   # Main article fetcher
+│   │   │   └── AddNewsSourceCommand.php
+│   │   ├── Helpers/                   # Reusable utilities
+│   │   │   ├── ArticleTransformer.php
+│   │   │   ├── CategoryHelper.php
+│   │   │   └── AuthorHelper.php
 │   │   ├── Http/
-│   │   │   ├── Controllers/Api/   # API Controllers (no business logic)
-│   │   │   ├── Requests/          # Form Request Validation
-│   │   │   │   ├── LoginRequest.php
-│   │   │   │   ├── RegisterRequest.php
-│   │   │   │   ├── ArticleFilterRequest.php
-│   │   │   │   ├── SearchArticlesRequest.php
-│   │   │   │   └── UpdatePreferenceRequest.php
-│   │   │   └── Resources/         # API Resources for consistent responses
-│   │   ├── Models/                # Eloquent Models
-│   │   ├── Repositories/          # Repository Pattern (all DB operations)
-│   │   │   ├── ArticleRepository.php
-│   │   │   ├── AuthRepository.php
-│   │   │   ├── SourceRepository.php
-│   │   │   └── UserPreferenceRepository.php
-│   │   └── Services/              # Business Logic Services
-│   │       ├── NewsService.php             # News fetching orchestrator
-│   │       ├── ArticleService.php          # Article operations
-│   │       ├── AuthService.php             # Authentication logic
-│   │       └── NewsAdapters/               # Adapter Pattern Implementation
-│   │           ├── AbstractNewsAdapter.php # Base adapter class
-│   │           ├── NewsApiAdapter.php      # NewsAPI adapter
-│   │           ├── GuardianAdapter.php     # Guardian adapter
-│   │           └── NYTAdapter.php          # NYT adapter
-│   ├── config/
-│   │   └── news_sources.php       # Profile-Based API Configuration
-│   ├── database/
-│   │   ├── migrations/            # Database Schema
-│   │   ├── seeders/               # Database Seeders
-│   │   │   ├── SourceSeeder.php   # Seeds news sources
-│   │   │   └── CategorySeeder.php # Seeds categories
-│   │   └── factories/             # Model Factories for testing
-│   ├── tests/                     # Comprehensive test suite
-│   │   ├── Feature/               # Feature tests (API endpoints)
-│   │   └── Unit/                  # Unit tests (Models, Services, Repos)
-│   ├── routes/api.php             # API Routes
-│   └── Dockerfile                 # Backend Container
+│   │   │   ├── Controllers/Api/
+│   │   │   ├── Requests/              # Form validation
+│   │   │   └── Resources/             # JSON responses
+│   │   ├── Repositories/              # All DB queries here
+│   │   └── Services/
+│   │       ├── ArticleService.php
+│   │       ├── AuthService.php
+│   │       └── NewsAdapters/          # Adapter pattern
+│   │           ├── AbstractNewsAdapter.php
+│   │           ├── NewsApiAdapter.php
+│   │           ├── GuardianAdapter.php
+│   │           └── NYTAdapter.php
+│   ├── config/news_sources.php        # API configurations
+│   └── tests/                         # PHPUnit tests
 │
-├── news-frontend/                 # Next.js Frontend
+├── news-frontend/
 │   ├── src/
-│   │   ├── app/                   # Next.js App Router Pages
-│   │   ├── components/            # Reusable UI Components
-│   │   │   ├── articles/          # Article-specific components
-│   │   │   ├── auth/              # Authentication components
-│   │   │   ├── layout/            # Layout components
-│   │   │   ├── providers/         # React Providers
-│   │   │   └── shared/            # Shared components
-│   │   ├── contexts/              # React Contexts (Auth)
-│   │   ├── hooks/                 # Custom React Query Hooks
-│   │   ├── lib/                   # Utilities & API Client
-│   │   │   ├── api.ts             # Axios instance
-│   │   │   ├── queryKeys.ts       # Query Key Factories
-│   │   │   └── utils.ts           # Helper functions
-│   │   └── types/                 # TypeScript Type Definitions
-│   └── Dockerfile                 # Frontend Container
+│   │   ├── app/                       # Next.js pages
+│   │   ├── components/                # React components
+│   │   ├── hooks/                     # Custom React Query hooks
+│   │   ├── lib/
+│   │   │   ├── queryKeys.ts           # Query key factories
+│   │   │   └── api.ts                 # Axios instance
+│   │   └── types/                     # TypeScript definitions
+│   └── Dockerfile
 │
-└── docker-compose.yml             # Container Orchestration
+└── docker-compose.yml
 ```
 
-## 📋 Prerequisites
+## Quick Start
 
-- Docker & Docker Compose (recommended)
-- OR Node.js 20+ and PHP 8.2+ (manual installation)
-- API Keys (free tier available):
+**Prerequisites:**
+- Docker & Docker Compose
+- API keys (free tier):
   - [NewsAPI.org](https://newsapi.org/)
   - [The Guardian](https://open-platform.theguardian.com/)
-  - [The New York Times](https://developer.nytimes.com/)
+  - [New York Times](https://developer.nytimes.com/)
 
-## 🚀 Quick Start (Docker)
+**Setup:**
 
-### Simplified Single-File Configuration
-
-This project uses a **centralized configuration approach** - all settings are in ONE `.env` file at the root. No need for separate backend/frontend environment files!
-
-1. **Create your environment file**
-   ```bash
-   cp .env.example .env
-   ```
-
-2. **Add your API keys**
-
-   Edit `.env` and add your free API keys:
-   ```bash
-   # Get your free API keys:
-   # - NewsAPI.org: https://newsapi.org/register (100 requests/day)
-   # - The Guardian: https://open-platform.theguardian.com/access/ (500 requests/day)
-   # - New York Times: https://developer.nytimes.com/get-started (500 requests/day)
-
-   NEWSAPI_KEY=your_newsapi_key_here
-   GUARDIAN_API_KEY=your_guardian_key_here
-   NYT_API_KEY=your_nyt_key_here
-   ```
-
-3. **Generate Laravel application key**
-   ```bash
-   docker-compose up -d mysql
-   docker-compose run --rm backend php artisan key:generate --show
-   ```
-
-   Copy the generated key (e.g., `base64:xxxxx...`) and paste it in your `.env` file:
-   ```bash
-   APP_KEY=base64:xxxxx...
-   ```
-
-4. **Launch all services**
-   ```bash
-   docker-compose up -d --build
-   ```
-
-5. **Initialize database**
-   ```bash
-   docker exec -it news_backend php artisan migrate
-   docker exec -it news_backend php artisan db:seed
-   ```
-
-   This will create the database schema and populate it with:
-   - **News Sources**: NewsAPI, The Guardian, New York Times
-   - **Categories**: Business, Technology, Sports, Entertainment, Health, Science, Politics, World
-
-6. **Fetch initial news articles**
-   ```bash
-   docker exec -it news_backend php artisan news:fetch
-   ```
-
-   This command fetches articles from all configured news sources. You can also fetch from specific sources:
-   ```bash
-   # Fetch from specific source
-   docker exec -it news_backend php artisan news:fetch newsapi
-   docker exec -it news_backend php artisan news:fetch guardian
-   docker exec -it news_backend php artisan news:fetch nyt
-   ```
-
-7. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000/api
-
-### Adding New News Sources
-
-The platform includes an automated command to add new news sources without manual configuration:
-
+1. Clone and configure environment:
 ```bash
-docker exec -it news_backend php artisan news:add-source
-
-# The command will interactively ask for:
-# - API identifier (e.g., bbc-news)
-# - Display name (e.g., BBC News)
-# - Base URL and API key
-# - Endpoints and field mappings
-# - Response structure
-
-# The command automatically:
-# ✓ Creates adapter class
-# ✓ Updates configuration
-# ✓ Creates database record
-# ✓ Updates NewsService
+cp .env.example .env
+# Edit .env and add your API keys
 ```
 
-This command creates everything needed for a new news source:
-- Adapter class in `app/Services/NewsAdapters/`
-- Configuration in `config/news_sources.php`
-- Database entry in `sources` table
-- Auto-registers in NewsService
-
-### Optional: Customize Settings
-
-All configuration is in the root `.env` file. You can customize:
+2. Generate Laravel app key:
 ```bash
-# Application settings
-APP_NAME=NewsHub
-APP_ENV=production
-APP_DEBUG=false
-
-# Database credentials
-DB_DATABASE=news_db
-DB_USERNAME=news_user
-DB_PASSWORD=your_secure_password_here
-
-# Port mappings (if you have conflicts)
-BACKEND_PORT=8000
-FRONTEND_PORT=3000
-DB_PORT=3307
+docker-compose up -d mysql
+docker-compose run --rm backend php artisan key:generate --show
+# Copy the output and paste it into .env as APP_KEY
 ```
 
-## 🔌 API Endpoints
-
-### Authentication
-```
-POST   /api/register              - Create new account
-POST   /api/login                 - Authenticate user
-POST   /api/logout                - Invalidate token
+3. Start all services:
+```bash
+docker-compose up -d --build
 ```
 
-### Articles
-```
-GET    /api/articles              - List articles (paginated, filterable)
-GET    /api/articles/{id}         - Get single article
-GET    /api/articles/search       - Search by keyword
-```
-
-### Personalization (Authenticated)
-```
-GET    /api/feed/personalized     - Get personalized feed
-GET    /api/preferences           - Get user preferences
-PUT    /api/preferences           - Update preferences
+4. Set up database:
+```bash
+docker exec -it news_backend php artisan migrate
+docker exec -it news_backend php artisan db:seed
 ```
 
-### Metadata
-```
-GET    /api/sources               - List all news sources
-GET    /api/categories            - List all categories
-```
-
-## 🎯 Key Implementation Highlights
-
-### 1. Adapter Pattern for News Sources
-The platform uses the Adapter pattern to integrate different news APIs:
-
-```php
-// Abstract base class defines the contract
-abstract class AbstractNewsAdapter {
-    abstract protected function extractArticles(array $data): array;
-    public function fetchArticles(array $params = []): ?array { }
-}
-
-// Each source implements its own adapter
-class NewsApiAdapter extends AbstractNewsAdapter {
-    protected function extractArticles(array $data): array {
-        return $data['articles'] ?? [];
-    }
-}
-
-class GuardianAdapter extends AbstractNewsAdapter {
-    protected function extractArticles(array $data): array {
-        return $data['response']['results'] ?? [];
-    }
-}
-
-// NewsService uses the adapters
-$adapter = $this->createAdapter($profileName, $profile);
-$articles = $adapter->fetchArticles($params);
+5. Fetch initial articles:
+```bash
+docker exec -it news_backend php artisan news:fetch
 ```
 
-### 2. Repository Pattern with Zero Direct DB Access
-Strict separation between data access and business logic:
+6. Open http://localhost:3000
 
-```php
-// Repository handles ALL database operations
-class ArticleRepository {
-    public function createOrUpdateArticle(string $urlHash, array $data): Article {
-        return $this->article->updateOrCreate(['url_hash' => $urlHash], $data);
-    }
-}
+## API Endpoints
 
-// Service ONLY uses repositories (no direct DB queries)
-class NewsService {
-    public function __construct(
-        private ArticleRepository $articleRepository,
-        private SourceRepository $sourceRepository
-    ) {}
+**Auth:**
+- `POST /api/register` - Create account
+- `POST /api/login` - Get auth token
+- `POST /api/logout` - Invalidate token
 
-    // Uses repository, not Article::
-    $this->articleRepository->createOrUpdateArticle($urlHash, $data);
-}
-```
+**Articles:**
+- `GET /api/articles` - List with filters (source, category, author, date)
+- `GET /api/articles/{id}` - Single article
+- `GET /api/articles/search?q=keyword` - Search
 
-### 3. Helper Classes for Clean Code
-Specialized helpers keep code DRY and maintainable:
+**Personalization (authenticated):**
+- `GET /api/feed/personalized` - Feed based on user preferences
+- `GET /api/preferences` - Current preferences
+- `PUT /api/preferences` - Update preferences
 
-```php
-// ArticleTransformer - transforms API data
-$transformed = ArticleTransformer::transform($data, $mapping, $imagePrefix);
-$urlHash = ArticleTransformer::generateUrlHash($url);
+**Metadata:**
+- `GET /api/sources` - All sources
+- `GET /api/categories` - All categories
 
-// CategoryHelper - manages categories
-$category = CategoryHelper::getOrCreate($categoryName);
+## Testing
 
-// AuthorHelper - manages authors
-$author = AuthorHelper::getOrCreate($authorName, $sourceId);
-```
-
-### 4. Form Request Validation
-Centralized validation with custom error messages:
-
-```php
-// Validation in dedicated Form Request class
-class RegisterRequest extends FormRequest {
-    public function rules(): array {
-        return [
-            'email' => ['required', 'email', 'unique:users'],
-            'password' => ['required', 'min:8', 'confirmed'],
-        ];
-    }
-}
-
-// Controller receives validated data automatically
-public function register(RegisterRequest $request) {
-    $validated = $request->validated(); // Already validated!
-}
-```
-
-### 5. React Query Best Practices
-Custom hooks with query key factories for optimal cache management:
-
-```typescript
-// Centralized hook
-export function useArticles(page: number, filters?: ArticleFilters) {
-  return useQuery({
-    queryKey: articleKeys.list(page, filters),
-    queryFn: () => fetchArticles(page, filters),
-  });
-}
-
-// Usage in component (no direct API calls)
-const { data, isLoading } = useArticles(page, filters);
-```
-
-## 🔒 Security Features
-
-- **Authentication**: Laravel Sanctum with secure token storage
-- **Authorization**: Route-level middleware protection
-- **CORS**: Configured for frontend domain only
-- **SQL Injection**: Protected via Eloquent ORM
-- **XSS Protection**: React's built-in escaping
-- **Environment Variables**: Sensitive data never committed
-- **Password Hashing**: Bcrypt with salt
-
-## 📈 Performance Optimizations
-
-### Backend
-- Database indexes on frequently queried columns
-- Eager loading to prevent N+1 queries
-- Pagination for large datasets
-- API response caching
-
-### Frontend
-- Next.js automatic code splitting
-- React Query cache management
-- Image optimization configured
-- Standalone Docker output
-- Lazy loading ready
-
-## 🧪 Comprehensive Testing Suite
-
-### Backend Testing (PHPUnit)
-
-The project includes an essential test suite covering critical backend functionality:
-
-#### Test Coverage
-
-- ✅ **Unit Tests - Models** (2 test files)
-  - ArticleTest: Tests relationships with Source, Category, Author
-  - UserTest: Tests password hashing and user preferences
-
-- ✅ **Unit Tests - Repositories** (1 test file)
-  - ArticleRepositoryTest: Tests pagination, filtering, search, and personalization
-
-- ✅ **Unit Tests - Services** (1 test file)
-  - ArticleServiceTest: Tests article retrieval and search functionality
-
-- ✅ **Feature Tests - Controllers** (2 test files)
-  - ArticleControllerTest: Tests API endpoints for articles, search, and personalized feed
-  - AuthControllerTest: Tests registration, login, logout, and authentication
-
-#### Running Tests
+I wrote a focused test suite covering the critical paths:
 
 ```bash
 # Run all tests
 docker exec -it news_backend php artisan test
 
-# Run specific test suite
+# Specific test suites
 docker exec -it news_backend php artisan test --testsuite=Unit
 docker exec -it news_backend php artisan test --testsuite=Feature
-
-# Run specific test file
-docker exec -it news_backend php artisan test --filter=ArticleRepositoryTest
-
-# Run with coverage (requires Xdebug)
-docker exec -it news_backend php artisan test --coverage
 ```
 
-#### Test Database
+**Coverage:**
+- Unit Tests: Models (Article, User), Repositories, Services
+- Feature Tests: Authentication flow, Article API endpoints, Personalized feed
 
-Tests use SQLite in-memory database for speed and isolation:
-- No database setup required
-- Each test runs in a transaction
-- Automatic rollback after each test
-- Fast execution (all tests complete in seconds)
+Tests run on SQLite in-memory for speed. All tests complete in under 5 seconds.
 
-#### Test Architecture Benefits
+## What I'd Improve With More Time
 
-- **Isolated**: Each test is independent and repeatable
-- **Fast**: In-memory SQLite database
-- **Comprehensive**: Tests cover models, repositories, services, controllers, and commands
-- **Maintainable**: Clear test structure following Laravel conventions
-- **Type-Safe**: Full PHPUnit type hints and assertions
-- **Mocked APIs**: HTTP responses mocked for reliable testing
+**Backend:**
+- Add request rate limiting to prevent abuse
+- Implement article deduplication (same story from different sources)
+- Background jobs with Redis/Queue for news fetching
+- More comprehensive error logging and monitoring
+- API versioning for backwards compatibility
 
-### Frontend Testing
+**Frontend:**
+- Add infinite scroll instead of pagination
+- Implement article bookmarking
+- Add reading history
+- Better error boundaries and fallback UIs
+- Accessibility improvements (ARIA labels, keyboard navigation)
+- Unit tests for components and hooks
 
-The architecture supports easy testing:
-- **React Query Hooks**: React Query testing utilities compatible
-- **Component Testing**: Ready for Jest/Vitest setup
-- **API Mocking**: MSW (Mock Service Worker) ready
+**DevOps:**
+- GitHub Actions CI/CD pipeline
+- Production-ready nginx config with caching
+- Database backups and disaster recovery
+- Monitoring (Sentry, DataDog, etc.)
+- Load testing
 
-## 🌟 Why This Project Stands Out
+## Design Patterns Used
 
-1. **Enterprise Architecture**: Not just a CRUD app, but production-ready architecture with proven design patterns
-2. **Scalability First**: Designed to handle growth from day one with adapter pattern and repository layer
-3. **Clean Code**: Follows SOLID principles and industry best practices religiously
-4. **Modern Stack**: Latest versions of Laravel 11, Next.js 15, and supporting libraries
-5. **Full Type Safety**: TypeScript throughout frontend, strict PHP typing in backend
-6. **Zero Direct DB Access**: All services use repositories exclusively - no DB queries in business logic
-7. **Adapter Pattern**: Easily extend with new news sources without modifying existing code
-8. **Form Request Validation**: Centralized validation with custom error messages
-9. **Helper Classes**: Reusable utilities for clean, DRY code
-10. **Automated CLI**: Add new news sources with a single command
-11. **Professional Patterns**: Repository, Service Layer, Adapter Pattern, Query Key Factories, Form Requests
-12. **Docker Ready**: Production-grade containerization with optimized multi-stage builds
-13. **Comprehensive Tests**: Full test suite covering unit and feature tests
-14. **Well Documented**: Comprehensive README and inline comments
-
-## 📚 Documentation
-
-- **Code Comments**: All complex logic explained
-- **Type Definitions**: Full TypeScript interfaces
-- **API Profiles**: Self-documenting configuration
-- **README**: Comprehensive setup and architecture guide
-
-## 🤝 Development Principles
-
-This project demonstrates:
-- ✅ Clean Architecture
-- ✅ SOLID Principles
-- ✅ DRY (Don't Repeat Yourself)
-- ✅ KISS (Keep It Simple, Stupid)
-- ✅ YAGNI (You Aren't Gonna Need It)
-- ✅ Separation of Concerns
-- ✅ Single Responsibility
-- ✅ Dependency Inversion
-- ✅ Interface-Based Design
-- ✅ Configuration Over Code
-
-## 🏆 Architecture Improvements Summary
-
-This project has been refactored to follow enterprise-level best practices:
-
-### Backend Architecture Layers
-```
-Controller (HTTP) → Form Request (Validation) → Service (Business Logic) → Repository (Data Access) → Model (ORM)
-```
-
-### News Fetching Architecture
-```
-NewsService → Adapter Factory → Concrete Adapter → API → Helper Classes → Repository → Database
-```
-
-### Key Refactorings Applied
-- ✅ **Adapter Pattern**: Abstract base class with concrete implementations for each news source
-- ✅ **Zero Direct DB Access**: All Model:: calls moved to repositories
-- ✅ **Helper Classes**: ArticleTransformer, CategoryHelper, AuthorHelper for reusable logic
-- ✅ **Form Request Validation**: All validation centralized in dedicated Request classes
-- ✅ **Service Layer Cleanup**: Services only orchestrate, no data transformation or DB queries
-- ✅ **Automated CLI**: Command to add new sources without manual file editing
-- ✅ **API Resources**: Consistent JSON response formatting across all endpoints
-
-### Design Patterns Implemented
-- **Repository Pattern**: Data access abstraction
-- **Service Layer Pattern**: Business logic encapsulation
-- **Adapter Pattern**: Multiple API integration
-- **Strategy Pattern**: Different extraction strategies per source
+- **Repository Pattern**: Abstracts data access
+- **Service Layer**: Encapsulates business logic
+- **Adapter Pattern**: Unifies multiple news APIs
+- **Strategy Pattern**: Different extraction logic per source
 - **Factory Pattern**: Dynamic adapter creation
-- **Dependency Injection**: All dependencies injected via constructor
+- **Form Requests**: Centralized validation
 
-## 🛠️ Troubleshooting
+## Why These Choices Matter
 
-See the detailed troubleshooting section in the full documentation for:
-- Docker issues and container management
-- Database connection problems
-- API rate limit handling
-- TypeScript configuration
-- Build and deployment issues
+I could have built this as a simple CRUD app with API calls directly in controllers. That would have met the requirements. But I wanted to show how I think about real-world applications:
 
-## 📄 License
+1. **Maintainability**: The next developer (or me in 6 months) should understand the code quickly
+2. **Extensibility**: Adding a new news source takes minutes, not hours
+3. **Testability**: Clean separation makes unit testing straightforward
+4. **Performance**: Local storage + smart caching = fast user experience
+5. **Best Practices**: SOLID principles aren't buzzwords - they genuinely make code better
 
-Private and proprietary project.
+## Tech Stack
+
+**Backend:**
+- Laravel 11 (PHP 8.2)
+- MySQL 8.0
+- Laravel Sanctum for auth
+- Guzzle for HTTP requests
+
+**Frontend:**
+- Next.js 15 (App Router)
+- TypeScript (strict mode)
+- TanStack Query v5
+- Tailwind CSS
+- Axios
+
+**DevOps:**
+- Docker with multi-stage builds
+- Docker Compose
+- Nginx
+- Supervisor for process management
+
+## Notes for Reviewers
+
+This took me about [X hours/days] to build. I prioritized code quality and architecture over adding every possible feature. The codebase is documented, tested, and follows Laravel and React conventions.
+
+If you have questions about any implementation decisions, I'm happy to discuss them. I made deliberate trade-offs and I can explain the reasoning behind each one.
 
 ---
 
-**Built with** ❤️ **using professional software engineering practices**
+Built by Amr Mohamed for innoscripta's full-stack developer challenge
