@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: news_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-news_db}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root_password}
+      MYSQL_USER: ${DB_USERNAME:-news_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-password}
+    ports:
+      - "${DB_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - news_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Laravel Backend
+  backend:
+    build:
+      context: ./news-backend
+      dockerfile: Dockerfile
+    container_name: news_backend
+    restart: unless-stopped
+    environment:
+      - APP_NAME=${APP_NAME:-NewsHub}
+      - APP_ENV=${APP_ENV:-production}
+      - APP_KEY=${APP_KEY}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_URL=${APP_URL:-http://localhost:8000}
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-news_db}
+      - DB_USERNAME=${DB_USERNAME:-news_user}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - NEWSAPI_KEY=${NEWSAPI_KEY}
+      - GUARDIAN_API_KEY=${GUARDIAN_API_KEY}
+      - NYT_API_KEY=${NYT_API_KEY}
+      - CACHE_STORE=database
+      - SESSION_DRIVER=database
+      - QUEUE_CONNECTION=database
+      - LOG_CHANNEL=stack
+    ports:
+      - "${BACKEND_PORT:-8000}:80"
+    volumes:
+      - ./news-backend:/var/www
+      - backend_storage:/var/www/storage
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - news_network
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./news-frontend
+      dockerfile: Dockerfile
+    container_name: news_frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - news_network
+
+networks:
+  news_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  backend_storage:
+    driver: local

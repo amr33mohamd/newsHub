@@ -1,0 +1,53 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Laravel
+/news-backend/vendor/
+/news-backend/node_modules/
+/news-backend/public/hot
+/news-backend/public/storage
+/news-backend/storage/*.key
+/news-backend/.env
+/news-backend/.env.backup
+/news-backend/.phpunit.result.cache
+/news-backend/Homestead.json
+/news-backend/Homestead.yaml
+/news-backend/npm-debug.log
+/news-backend/yarn-error.log
+
+# Next.js
+/news-frontend/.next/
+/news-frontend/out/
+/news-frontend/node_modules/
+/news-frontend/.env*.local
+/news-frontend/.vercel
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+/build
+/dist
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Docker
+docker-compose.override.yml
+
+# Misc
+*.cache
+.cache/
