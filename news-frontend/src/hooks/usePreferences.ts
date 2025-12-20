@@ -7,8 +7,8 @@ export function usePreferences() {
   return useQuery({
     queryKey: preferenceKeys.detail(),
     queryFn: async () => {
-      const response = await api.get<UserPreference>('/preferences');
-      return response.data;
+      const response = await api.get<{ data: UserPreference }>('/preferences');
+      return response.data.data;
     },
   });
 }
@@ -18,8 +18,8 @@ export function useUpdatePreferences() {
 
   return useMutation({
     mutationFn: async (data: Partial<UserPreference>) => {
-      const response = await api.put('/preferences', data);
-      return response.data;
+      const response = await api.put<{ data: UserPreference }>('/preferences', data);
+      return response.data.data;
     },
     onSuccess: () => {
       // Invalidate preferences

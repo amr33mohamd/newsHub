@@ -7,8 +7,8 @@ export function useSources() {
   return useQuery({
     queryKey: sourceKeys.list(),
     queryFn: async () => {
-      const response = await api.get<Source[]>('/sources');
-      return response.data;
+      const response = await api.get<{ data: Source[] }>('/sources');
+      return response.data.data;
     },
   });
 }

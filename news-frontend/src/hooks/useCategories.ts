@@ -7,8 +7,8 @@ export function useCategories() {
   return useQuery({
     queryKey: categoryKeys.list(),
     queryFn: async () => {
-      const response = await api.get<Category[]>('/categories');
-      return response.data;
+      const response = await api.get<{ data: Category[] }>('/categories');
+      return response.data.data;
     },
   });
 }

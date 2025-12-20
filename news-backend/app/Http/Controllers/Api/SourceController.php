@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\SourceResource;
 use App\Repositories\SourceRepository;
 
 class SourceController extends Controller
@@ -31,6 +32,6 @@ class SourceController extends Controller
      */
     public function index()
     {
-        return response()->json($this->sourceRepository->getAllSources());
+        return SourceResource::collection($this->sourceRepository->getAllSources());
     }
 }

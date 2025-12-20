@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdatePreferenceRequest;
+use App\Http\Resources\UserPreferenceResource;
 use App\Repositories\UserPreferenceRepository;
 use Illuminate\Http\Request;
 
@@ -44,31 +46,24 @@ class PreferenceController extends Controller
             ]);
         }
 
-        return response()->json($preferences);
+        return new UserPreferenceResource($preferences);
     }
 
     /**
      * Update user preferences
      *
-     * @param Request $request
+     * @param UpdatePreferenceRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request)
+    public function update(UpdatePreferenceRequest $request)
     {
-        $request->validate([
-            'preferred_sources' => 'nullable|array',
-            'preferred_sources.*' => 'exists:sources,id',
-            'preferred_categories' => 'nullable|array',
-            'preferred_categories.*' => 'exists:categories,id',
-            'preferred_authors' => 'nullable|array',
-            'preferred_authors.*' => 'exists:authors,id',
-        ]);
+        $validated = $request->validated();
 
         $preferences = $this->preferenceRepository->updatePreferences(
             $request->user()->id,
-            $request->only(['preferred_sources', 'preferred_categories', 'preferred_authors'])
+            $validated
         );
 
-        return response()->json($preferences);
+        return new UserPreferenceResource($preferences);
     }
 }

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useCategories } from '@/hooks';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface NavbarProps {
   currentCategoryId?: number;
@@ -13,6 +13,29 @@ export function Navbar({}: NavbarProps = {}) {
   const { user, logout } = useAuth();
   const { data: categories } = useCategories();
   const [categoriesMenuOpen, setCategoriesMenuOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        buttonRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setCategoriesMenuOpen(false);
+      }
+    }
+
+    if (categoriesMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [categoriesMenuOpen]);
 
   return (
     <nav className="bg-white border-b border-gray-200">
@@ -21,6 +44,7 @@ export function Navbar({}: NavbarProps = {}) {
           {/* Left: Logo and Categories */}
           <div className="flex items-center gap-3">
             <button
+              ref={buttonRef}
               onClick={() => setCategoriesMenuOpen(!categoriesMenuOpen)}
               className="p-2 hover:bg-gray-50 rounded-lg transition-colors"
               aria-label="Toggle categories menu"
@@ -83,10 +107,19 @@ export function Navbar({}: NavbarProps = {}) {
 
       {/* Categories Dropdown Menu */}
       {categoriesMenuOpen && (
-        <div className="absolute left-0 right-0 top-16 bg-white shadow-lg border-b border-gray-200 z-50">
+        <div ref={dropdownRef} className="absolute left-0 right-0 top-16 bg-white shadow-lg border-b border-gray-200 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="mb-4">
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3">Browse by Category</h3>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Browse by Category</h3>
+              <button
+                onClick={() => setCategoriesMenuOpen(false)}
+                className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Close categories menu"
+              >
+                <svg className="w-5 h-5 text-gray-500 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               <Link

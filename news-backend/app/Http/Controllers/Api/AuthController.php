@@ -3,67 +3,60 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Http\Requests\LoginRequest;
+use App\Http\Requests\RegisterRequest;
+use App\Http\Resources\UserResource;
+use App\Services\AuthService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
     /**
+     * The AuthService instance
+     *
+     * @var AuthService
+     */
+    protected $authService;
+
+    /**
+     * AuthController constructor.
+     *
+     * @param AuthService $authService
+     */
+    public function __construct(AuthService $authService)
+    {
+        $this->authService = $authService;
+    }
+
+    /**
      * Register a new user
      *
-     * @param Request $request
+     * @param RegisterRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function register(Request $request)
+    public function register(RegisterRequest $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:8|confirmed',
-        ]);
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $result = $this->authService->register($request->validated());
 
         return response()->json([
-            'user' => $user,
-            'token' => $token,
+            'user' => new UserResource($result['user']),
+            'token' => $result['token'],
         ], 201);
     }
 
     /**
      * Login user and create token
      *
-     * @param Request $request
+     * @param LoginRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
-            ]);
-        }
-
-        $token = $user->createToken('auth_token')->plainTextToken;
+        $result = $this->authService->login($request->validated());
 
         return response()->json([
-            'user' => $user,
-            'token' => $token,
+            'user' => new UserResource($result['user']),
+            'token' => $result['token'],
         ]);
     }
 
@@ -75,7 +68,7 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $this->authService->logout($request->user());
 
         return response()->json(['message' => 'Successfully logged out']);
     }
@@ -88,6 +81,6 @@ class AuthController extends Controller
      */
     public function user(Request $request)
     {
-        return response()->json($request->user());
+        return new UserResource($request->user());
     }
 }

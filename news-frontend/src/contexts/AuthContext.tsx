@@ -40,8 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('auth_token');
       if (token) {
         setCookie('auth_token', token, 7);
-        const response = await api.get('/user');
-        setUser(response.data);
+        const response = await api.get<{ data: User }>('/user');
+        setUser(response.data.data);
       }
     } catch {
       clearAuthToken();

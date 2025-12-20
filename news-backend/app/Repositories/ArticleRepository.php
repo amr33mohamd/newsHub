@@ -179,4 +179,19 @@ class ArticleRepository
 
         return $query->orderBy('published_at', 'desc')->paginate($perPage);
     }
+
+    /**
+     * Create or update an article by URL hash
+     *
+     * @param string $urlHash
+     * @param array $data
+     * @return Article
+     */
+    public function createOrUpdateArticle(string $urlHash, array $data): Article
+    {
+        return $this->article->updateOrCreate(
+            ['url_hash' => $urlHash],
+            $data
+        );
+    }
 }

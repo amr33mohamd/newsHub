@@ -43,4 +43,15 @@ class SourceRepository
     {
         return $this->source->findOrFail($id);
     }
+
+    /**
+     * Get source by API identifier
+     *
+     * @param string $apiIdentifier
+     * @return Source|null
+     */
+    public function findByApiIdentifier(string $apiIdentifier): ?Source
+    {
+        return $this->source->where('api_identifier', $apiIdentifier)->first();
+    }
 }

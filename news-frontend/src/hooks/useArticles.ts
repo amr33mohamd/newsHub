@@ -20,8 +20,8 @@ export function useArticle(id: number) {
   return useQuery({
     queryKey: articleKeys.detail(id),
     queryFn: async () => {
-      const response = await api.get<Article>(`/articles/${id}`);
-      return response.data;
+      const response = await api.get<{ data: Article }>(`/articles/${id}`);
+      return response.data.data;
     },
   });
 }

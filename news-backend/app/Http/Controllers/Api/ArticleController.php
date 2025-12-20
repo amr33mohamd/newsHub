@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ArticleFilterRequest;
+use App\Http\Requests\SearchArticlesRequest;
+use App\Http\Resources\ArticleResource;
 use App\Services\ArticleService;
 use Illuminate\Http\Request;
 
@@ -29,26 +32,27 @@ class ArticleController extends Controller
      * Get all articles with pagination
      * Returns personalized feed if user is authenticated, otherwise returns all articles
      *
-     * @param Request $request
+     * @param ArticleFilterRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function index(Request $request)
+    public function index(ArticleFilterRequest $request)
     {
-        $perPage = $request->get('per_page', 12);
-        $filters = $request->only(['source_id', 'category_id', 'from_date', 'to_date']);
+        $validated = $request->validated();
+        $perPage = $validated['per_page'] ?? 12;
+        $filters = array_intersect_key($validated, array_flip(['source_id', 'category_id', 'from_date', 'to_date']));
 
         // Try to authenticate via Sanctum token (optional authentication)
         $user = auth('sanctum')->user();
 
         // If user is authenticated, return personalized feed
         if ($user) {
-            return response()->json(
+            return ArticleResource::collection(
                 $this->articleService->getPersonalizedFeed($user->id, $perPage, $filters)
             );
         }
 
         // Otherwise return all articles
-        return response()->json($this->articleService->getAllArticles($perPage, $filters));
+        return ArticleResource::collection($this->articleService->getAllArticles($perPage, $filters));
     }
 
     /**
@@ -59,22 +63,23 @@ class ArticleController extends Controller
      */
     public function show($id)
     {
-        return response()->json($this->articleService->getArticleById($id));
+        return new ArticleResource($this->articleService->getArticleById($id));
     }
 
     /**
      * Search articles with optional filters
      *
-     * @param Request $request
+     * @param SearchArticlesRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function search(Request $request)
+    public function search(SearchArticlesRequest $request)
     {
-        $keyword = $request->get('keyword', '');
-        $filters = $request->only(['source_id', 'category_id', 'from_date', 'to_date']);
-        $perPage = $request->get('per_page', 12);
+        $validated = $request->validated();
+        $keyword = $validated['keyword'] ?? '';
+        $perPage = $validated['per_page'] ?? 12;
+        $filters = array_intersect_key($validated, array_flip(['source_id', 'category_id', 'from_date', 'to_date']));
 
-        return response()->json(
+        return ArticleResource::collection(
             $this->articleService->searchArticles($keyword, $filters, $perPage)
         );
     }
@@ -82,14 +87,17 @@ class ArticleController extends Controller
     /**
      * Get personalized article feed for authenticated user
      *
-     * @param Request $request
+     * @param ArticleFilterRequest $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function personalized(Request $request)
+    public function personalized(ArticleFilterRequest $request)
     {
-        $perPage = $request->get('per_page', 12);
-        return response()->json(
-            $this->articleService->getPersonalizedFeed($request->user()->id, $perPage)
+        $validated = $request->validated();
+        $perPage = $validated['per_page'] ?? 12;
+        $filters = array_intersect_key($validated, array_flip(['source_id', 'category_id', 'from_date', 'to_date']));
+
+        return ArticleResource::collection(
+            $this->articleService->getPersonalizedFeed($request->user()->id, $perPage, $filters)
         );
     }
 }
