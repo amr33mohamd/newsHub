@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./screenshot.png" alt="NewsHub Application Screenshot" width="100%">
+</div>
+
 # NewsHub - Full-Stack News Aggregator
 
 A news aggregation platform built for innoscripta's take-home challenge. This project pulls articles from NewsAPI.org, The Guardian, and The New York Times, storing them locally for fast filtering and personalized feeds.
