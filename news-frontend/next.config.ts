@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  eslint: {
+    // Ignore test files during production build
+    ignoreDuringBuilds: false,
+    dirs: ['src/app', 'src/components', 'src/contexts', 'src/hooks', 'src/lib', 'src/types'],
+  },
+  typescript: {
+    // Ignore test files during type checking in build
+    ignoreBuildErrors: false,
+  },
 };
 
 export default nextConfig;

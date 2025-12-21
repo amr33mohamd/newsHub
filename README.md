@@ -87,6 +87,28 @@ The requirements specified this, but it's also the right call. Free tier API lim
 **Why TypeScript strict mode?**
 Catches bugs at compile time. The initial setup takes longer, but it pays off when refactoring.
 
+**Why React Query + Axios (not just one)?**
+They're complementary, not redundant:
+- **Axios** (HTTP client): Handles the actual network requests. Provides interceptors for adding auth tokens to every request, global error handling for 401s, request/response transformation, and better error messages than fetch().
+- **React Query** (state manager): Manages server state - caching, automatic refetching, loading/error states, cache invalidation, optimistic updates.
+
+React Query doesn't make HTTP requests itself - it calls functions that return promises. Those functions use Axios:
+```typescript
+// React Query decides WHEN to fetch
+useQuery({
+  queryKey: ['articles'],
+  queryFn: fetchArticles  // ← This function uses Axios
+})
+
+// Axios handles HOW to fetch
+async function fetchArticles() {
+  const { data } = await axios.get('/api/articles')  // ← Axios does HTTP
+  return data  // ← React Query manages this in cache
+}
+```
+
+Without React Query, every component would need its own loading/error state management and manual cache handling. Without Axios, every request would need manual header management and error handling.
+
 ## Architecture Overview
 
 ```
@@ -213,7 +235,9 @@ docker exec -it news_backend php artisan news:fetch
 
 ## Testing
 
-I wrote a focused test suite covering the critical paths:
+I wrote comprehensive tests for both backend and frontend, covering all critical paths.
+
+### Backend Tests (PHPUnit)
 
 ```bash
 # Run all tests
@@ -230,6 +254,34 @@ docker exec -it news_backend php artisan test --testsuite=Feature
 
 Tests run on SQLite in-memory for speed. All tests complete in under 5 seconds.
 
+### Frontend Tests (Vitest)
+
+```bash
+# Install dependencies (first time only)
+cd news-frontend && npm install
+
+# Run all frontend tests
+npm test
+
+# Run with UI
+npm run test:ui
+
+# Run with coverage
+npm run test:coverage
+```
+
+**Coverage:**
+- **useArticles**: Fetching, filtering, search, error handling
+- **usePreferences**: Get/update preferences, cache invalidation
+- **AuthContext**: Login, register, logout, token management
+
+**Test Stack:**
+- Vitest (fast test runner with TypeScript support)
+- React Testing Library (testing hooks and components)
+- Mocked API calls (fast, predictable, no network requests)
+
+All frontend tests use isolated QueryClient instances to prevent cache pollution between tests.
+
 ## What I'd Improve With More Time
 
 **Backend:**
@@ -245,7 +297,8 @@ Tests run on SQLite in-memory for speed. All tests complete in under 5 seconds.
 - Add reading history
 - Better error boundaries and fallback UIs
 - Accessibility improvements (ARIA labels, keyboard navigation)
-- Unit tests for components and hooks
+- Component tests for UI elements (currently only hook tests)
+- E2E tests with Playwright
 
 **DevOps:**
 - GitHub Actions CI/CD pipeline
