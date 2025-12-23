@@ -353,7 +353,7 @@ I could have built this as a simple CRUD app with API calls directly in controll
 
 ## Notes for Reviewers
 
-This took me about [X hours/days] to build. I prioritized code quality and architecture over adding every possible feature. The codebase is documented, tested, and follows Laravel and React conventions.
+This took me about [4 /days] to build. I prioritized code quality and architecture over adding every possible feature. The codebase is documented, tested, and follows Laravel and React conventions.
 
 If you have questions about any implementation decisions, I'm happy to discuss them. I made deliberate trade-offs and I can explain the reasoning behind each one.
 
