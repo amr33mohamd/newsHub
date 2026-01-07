@@ -178,6 +178,7 @@ news/
 
 **Prerequisites:**
 - Docker & Docker Compose
+- Node.js 20+ (for local frontend development)
 - API keys (free tier):
   - [NewsAPI.org](https://newsapi.org/)
   - [The Guardian](https://open-platform.theguardian.com/)
@@ -185,36 +186,82 @@ news/
 
 **Setup:**
 
-1. Clone and configure environment:
+1. Clone and configure environment files:
 ```bash
+# Root configuration for Docker Compose
 cp .env.example .env
-# Edit .env and add your API keys
+
+# Backend configuration
+cp news-backend/.env.example news-backend/.env
+# Edit news-backend/.env and add your API keys
+
+# Frontend configuration
+cp news-frontend/.env.local.example news-frontend/.env.local
 ```
 
-2. Generate Laravel app key:
+2. Configure API keys in `news-backend/.env`:
+```env
+NEWSAPI_KEY=your_newsapi_key
+GUARDIAN_API_KEY=your_guardian_key
+NYT_API_KEY=your_nyt_key
+```
+
+3. Generate Laravel app key:
 ```bash
+# Start MySQL first
 docker-compose up -d mysql
+
+# Generate and display the key
 docker-compose run --rm backend php artisan key:generate --show
-# Copy the output and paste it into .env as APP_KEY
+
+# Copy the output (e.g., base64:xxx...) and add it to news-backend/.env as APP_KEY
 ```
 
-3. Start all services:
+4. Install frontend dependencies locally (required for hot reloading):
+```bash
+cd news-frontend
+npm ci
+cd ..
+```
+
+5. Start all services:
 ```bash
 docker-compose up -d --build
 ```
 
-4. Set up database:
+6. Set up database:
 ```bash
-docker exec -it news_backend php artisan migrate
-docker exec -it news_backend php artisan db:seed
+docker-compose exec backend php artisan migrate
+docker-compose exec backend php artisan db:seed
 ```
 
-5. Fetch initial articles:
+7. Fetch initial articles:
 ```bash
-docker exec -it news_backend php artisan news:fetch
+docker-compose exec backend php artisan news:fetch
 ```
 
-6. Open http://localhost:3000
+8. Access the application:
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000/api
+
+**Development Mode:**
+
+The setup runs Next.js in development mode with hot reloading enabled. Any changes to files in `news-frontend/src/` will automatically trigger a browser reload.
+
+**Stopping Services:**
+```bash
+docker-compose down
+```
+
+**Viewing Logs:**
+```bash
+# All services
+docker-compose logs -f
+
+# Specific service
+docker-compose logs -f frontend
+docker-compose logs -f backend
+```
 
 ## API Endpoints
 
