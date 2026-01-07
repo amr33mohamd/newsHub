@@ -6,8 +6,6 @@ services:
     image: mysql:8.0
     container_name: news_mysql
     restart: unless-stopped
-    env_file:
-      - ./news-backend/.env
     environment:
       MYSQL_DATABASE: ${DB_DATABASE}
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
@@ -56,6 +54,8 @@ services:
       - ./news-frontend/.env.local
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      - ./news-frontend:/app
     depends_on:
       - backend
     networks:

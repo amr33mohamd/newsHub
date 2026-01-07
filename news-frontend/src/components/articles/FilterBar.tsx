@@ -48,7 +48,7 @@ export function FilterBar({ onFilterChange, currentFilters }: FilterBarProps) {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      <button
+      <div
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full p-4 flex items-center justify-between hover:bg-gray-50 transition-colors md:cursor-default md:pointer-events-none"
       >
@@ -89,7 +89,7 @@ export function FilterBar({ onFilterChange, currentFilters }: FilterBarProps) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
-      </button>
+      </div>
 
       <div className={`${isExpanded ? 'block' : 'hidden'} md:block border-t border-gray-100`}>
         <div className="p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
